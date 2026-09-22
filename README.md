@@ -73,7 +73,7 @@ python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1])); print('YAML OK')
 W pliku nie może być tabulatorów (tylko spacje), znaków `` ``` `` ani żadnego tekstu przed `name:`.
 Bez Pythona wystarczy `cat -A | head -2` — znaki `^I` to tabulatory, `^M` to Windows CRLF.
 
-Poniższy blok to kopia 1:1 tego samego pliku:
+Poniższy blok to kopia 1:1 tego samego pliku (z raportem błędu jako issue, bo logi CI są poza zasięgiem tej maszyny):
 
 ```yaml
 name: Build NIXI APK (debug)
@@ -86,6 +86,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   build:
@@ -133,9 +134,11 @@ jobs:
         run: |
           java -version
           gradle --version
+          echo "ANDROID_HOME=${ANDROID_HOME:-brak}"
+          ls "${ANDROID_HOME:-/opt/android-sdk}/platforms" 2>/dev/null || true
 
       - name: Build debug APK
-        run: gradle --no-daemon --stacktrace=full assembleDebug
+        run: gradle --no-daemon --stacktrace=full assembleDebug 2>&1 | tee /tmp/build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -144,6 +147,29 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+      # Logi CI leza na innej domenie niz api.github.com - ten krok wynosi blad tam,
+      # skad da sie go odczytac (issue + summary), zamiast klikac "View raw logs".
+      - name: Publish build report (issue + job summary)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## Build APK - raport bledu (run \`${GITHUB_RUN_ID}\`)"
+            echo
+            echo "- commit: \`${GITHUB_SHA}\` | branch: \`${GITHUB_REF_NAME}\`"
+            echo "- pelny log: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo '```'
+            tail -n 160 /tmp/build.log 2>/dev/null || echo "brak /tmp/build.log"
+            grep -E '^(FAILURE|> Task .*FAILED|BUILD FAILED|What went wrong|Caused by|e: )' /tmp/build.log 2>/dev/null | head -40 || true
+            echo '```'
+          } > /tmp/report.md
+          tail -n 80 /tmp/report.md >> "$GITHUB_STEP_SUMMARY"
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "CI: APK build failed on ${GITHUB_REF_NAME} (${GITHUB_SHA::7})" \
+            --body-file /tmp/report.md \
 ```
 
 APK jest w środku: **`app/build/outputs/apk/debug/app-debug.apk`**.
