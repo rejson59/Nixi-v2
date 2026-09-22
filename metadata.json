@@ -1,0 +1,6 @@
+{
+  "name": "NIXI",
+  "description": "Profesjonalna asystentka AI z obsługą głosową, modelem Gemini, integracją Supabase, Spotify oraz narzędziami automatyzacji telefonu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
