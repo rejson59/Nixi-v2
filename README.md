@@ -58,8 +58,10 @@ git add .github/workflows/build-apk.yml && git commit -m "ci: build APK on Actio
 
 Przez przeglądarkę: **`Actions → New workflow → Set up a workflow yourself → wklej zawartość`**
 i **`Commit changes`**. Wklejaj w trybie edycji (surowy tekst), nie z podglądu wyrenderowanego
-README. Jeśli w pierwszym wierszu jest cokolwiek innego niż `name: ...` (np. tytuł sekcji, `---`
-albo trzy backticki z bloku kodu) — GitHub wywali się na linii 1–2 właśnie.
+README. **Sprawdzony przebieg błędu „error on line 2": w 1. wierszu pliku zostało samo słowo
+`yaml`** — resztka nagłówka bloku kodu z README. Wtedy 2. linia (`name: Build NIXI APK (debug)`)
+przestaje być częścią dokumentu YAML i na niej parser się wywala. Leczy to skreślenie wszystkiego
+przed `name:`; najlepiej w ogóle nie przepisywać, tylko skopiować plik z repo.
 
 Szybka kontrola po wklejeniu:
 
@@ -149,18 +151,31 @@ jobs:
           retention-days: 30
 
       # Logi CI leza na innej domenie niz api.github.com - ten krok wynosi blad tam,
-      # skad da sie go odczytac (issue + summary), zamiast klikac "View raw logs".
+      # skad da sie go odczytac (issue + job summary), zamiast klikac "View raw logs".
       - name: Publish build report (issue + job summary)
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          grep -E '^(FAILURE|> Task .*FAILED|BUILD FAILED|What went wrong|Caused by|e: )|^[[:space:]]+at ' /tmp/build.log \
+            | head -n 80 > /tmp/err.txt
           {
-            echo "## Build APK - raport bledu (run \`${GITHUB_RUN_ID}\`)"
+            echo "## Build APK - raport bledu (run $GITHUB_RUN_ID)"
             echo
-            echo "- commit: \`${GITHUB_SHA}\` | branch: \`${GITHUB_REF_NAME}\`"
-            echo "- pelny log: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo '```'
+            echo "- commit: `$GITHUB_SHA` | branch: `$GITHUB_REF_NAME`"
+            echo "- pelny log: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            sed 's/^/    /' /tmp/err.txt
+            echo
+            echo "### Ogon logu"
+            tail -n 100 /tmp/build.log | sed 's/^/    /'
+          } > /tmp/report.md
+          { echo "### Build APK - blad (skrot)"; echo; sed 's/^/    /' /tmp/err.txt; } >> "$GITHUB_STEP_SUMMARY"
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "CI: APK build failed on $GITHUB_REF_NAME (${GITHUB_SHA:0:7})" \
+            --body-file /tmp/report.md
+```'
             tail -n 160 /tmp/build.log 2>/dev/null || echo "brak /tmp/build.log"
             grep -E '^(FAILURE|> Task .*FAILED|BUILD FAILED|What went wrong|Caused by|e: )' /tmp/build.log 2>/dev/null | head -40 || true
             echo '```'
