@@ -13,7 +13,8 @@ Aplikacja **natywna na Androida** (Kotlin + Jetpack Compose, Gradle Kotlin DSL, 
 |---|---|
 | Android Gradle Plugin | `9.1.1` → wymaga **Gradle ≥ 9.1.0** i **JDK ≥ 17** |
 | Gradle (wrapper) | `9.3.1` (`gradle/wrapper/gradle-wrapper.properties`) |
-| Kotlin / Compose | `2.2.10` / BOM `2024.09.00` |
+| Kotlin / Compose | `2.2.10` / BOM `2024.09.00` (AGP 9 = built-in Kotlin, `kotlin-android` celowo nie jest użyty) |
+| KSP | `2.3.5` — **ta wersja crashuje na CI** (patrz sekcja 5), potrzebne ≥ 2.3.6 |
 | `compileSdk` / `targetSdk` / `minSdk` | `36.1` / `36` / `24` |
 | `applicationId` | `com.aistudio.nixi.vxaklm` |
 | Klucze API | przez Secrets Gradle Plugin z pliku **`.env`** w katalogu głównym (`.env.example` to szablon) |
@@ -134,7 +135,7 @@ jobs:
           gradle --version
 
       - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+        run: gradle --no-daemon --stacktrace=full assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -240,6 +241,7 @@ Brak `ANDROID_HOME`? Ustaw `sdk.dir=/ścieżka/do/android-sdk` w pliku `local.pr
 | Błąd | Przyczyna i naprawa |
 |---|---|
 | `Invalid workflow file ... error in your yaml syntax on line 2` | pierwszy wiersz pliku to nie YAML: wkleił się nagłówek/tytuł README, ``` ``` ``` albo tabulatory zamiast spacji. Poprawka: `cp build-apk.yml .github/workflows/` z repo (sekcja 2) albo usunięcie śmieci sprzed `name:`. Sprawdź: `head -2` musi dać `name: Build NIXI APK (debug)` i pusty wiersz |
+| `NullPointerException: Cannot invoke "ksp.com.intellij.openapi.application.Application.getService(...)" because ... ApplicationManager.getApplication() is null` (krok `Build debug APK`, fail przy `kspDebugKotlin`) | **znany błąd KSP 2.3.5 poza IntelliJ/na CI** ([google/ksp#2763](https://github.com/google/ksp/issues/2763)) — w tym projekcie `gradle/libs.versions.toml` ma `googleDevtoolsKsp = "2.3.5"`. Naprawa bez ruszania kodu: podnieś jedną liczbę do wersji ≥ 2.3.6 (ostatnia: `2.3.12`). Obejście „na już" bez commita: dodaj `-Pksp.incremental=false` do komendy gradle albo `--no-daemon` + `ksp` w wersji 2.3.12 przez `-PkspVersion` nie zadziała — zmień katalog |
 | `refusing to allow a GitHub App to create or update workflow ... without 'workflows' permission` | push pliku z `.github/workflows/` przez zewnętrzną integrację/bota — utwórz ten plik własnym kontem (web editor albo lokalnie), ewentualnie `Settings → GitHub Apps → Configure → Repository access / Workflows: Read & write` |
 | `Could not find debug.keystore` / `Keystore file ... not found` | `build.gradle.kts` wymaga `debug.keystore` w katalogu głównym → krok *Create debug.keystore* (sekcja 2) |
 | `Unsupported class file major version` / build gradle fail | zła wersja Gradle lub JDK — musi być Gradle ≥ 9.1 i JDK ≥ 17 (workflow pinuje 9.3.1 + JDK 21) |
