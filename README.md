@@ -170,6 +170,16 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "CI: APK build failed on ${GITHUB_REF_NAME} (${GITHUB_SHA::7})" \
             --body-file /tmp/report.md \
+```'
+            tail -n 160 /tmp/build.log 2>/dev/null || echo "brak /tmp/build.log"
+            grep -E '^(FAILURE|> Task .*FAILED|BUILD FAILED|What went wrong|Caused by|e: )' /tmp/build.log 2>/dev/null | head -40 || true
+            echo '```'
+          } > /tmp/report.md
+          tail -n 80 /tmp/report.md >> "$GITHUB_STEP_SUMMARY"
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "CI: APK build failed on ${GITHUB_REF_NAME} (${GITHUB_SHA::7})" \
+            --body-file /tmp/report.md \
 ```
 
 APK jest w środku: **`app/build/outputs/apk/debug/app-debug.apk`**.
