@@ -1,10 +1,10 @@
-yaml
 name: Build NIXI APK (debug)
 
 on:
-  workflow_dispatch:        # ręczny przycisk "Run workflow" w zakładce Actions
+  workflow_dispatch:
   push:
-    branches: [main]        # usuń ten blok, jeśli chcesz budować wyłącznie ręcznie
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     name: assembleDebug
-    runs-on: ubuntu-latest   # runner GitHub ma już Android SDK + JDK
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -24,7 +24,6 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # Ten projekt wymaga Gradle >= 9.1 (AGP 9.x) - pobieramy dokładną wersję z wrapper properties
       - name: Set up Gradle 9.3.1
         run: |
           set -euo pipefail
@@ -32,7 +31,6 @@ jobs:
           unzip -q /tmp/gradle.zip -d /opt
           echo "/opt/gradle-9.3.1/bin" >> "$GITHUB_PATH"
 
-      # app/build.gradle.kts wskazuje signingConfig debug na ten plik - bez niego build padnie
       - name: Create debug.keystore (signingConfig "debugConfig")
         run: |
           keytool -genkeypair -v \
@@ -41,7 +39,6 @@ jobs:
             -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
             -keyalg RSA -keysize 2048 -validity 10000
 
-      # Secretplugin czyta .env z głównego katalogu -> BuildConfig.GEMINI_API_KEY itd.
       - name: Create .env from secrets
         run: |
           {
@@ -55,7 +52,9 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Show toolchain
-        run: java -version && gradle --version
+        run: |
+          java -version
+          gradle --version
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
