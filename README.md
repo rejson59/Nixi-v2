@@ -58,9 +58,7 @@ git add .github/workflows/build-apk.yml && git commit -m "ci: build APK on Actio
 
 Przez przeglądarkę: **`Actions → New workflow → Set up a workflow yourself → wklej zawartość`**
 i **`Commit changes`**. Wklejaj w trybie edycji (surowy tekst), nie z podglądu wyrenderowanego
-README. Konkretny objaw „error on line 2\": jeśli w 1. wierszu zostało samo słowo **`yaml`**
-(resztka nagłówka bloku ``` ```yaml ```) albo inny tekst bez dwukropka, parser potyka się dopiero
-w linii 2 — czyli na `name:`. Usuń ten śmieć przed `name:`, a plik zacznie przechodzić walidację.
+README. Konkretny objaw „error on line 2": w 1. wierszu pliku zostało samo słowo **yaml** (resztka nagłówka bloku kodu z README) i parser potyka się dopiero w 2. wierszu, na `name:`. Skreśl tę śmieciową linię, a plik przejdzie walidację Usuń ten śmieć przed `name:`, a plik zacznie przechodzić walidację.
 
 Szybka kontrola po wklejeniu:
 
