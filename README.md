@@ -35,7 +35,10 @@ Jeśli wolisz `./gradlew`, raz uruchom lokalnie `gradle wrapper --gradle-version
 2. **Dodaj secrets** — `Settings → Secrets and variables → Actions → New repository secret`:
    `GEMINI_API_KEY` (klucz z Google AI Studio), opcjonalnie `SUPABASE_URL` i `SUPABASE_ANON_KEY`.
    (Można pominąć — wtedy klucz wpisujesz po prostu w ustawieniach aplikacji na telefonie.)
-3. **Uruchom build** — zakładka `Actions → Build NIXI APK (debug) → Run workflow → Run workflow`.
+3. **Uruchom build** — zakładka `Actions → Build NIXI APK (debug) → Run workflow` (albo
+   `gh workflow run build-apk.yml -f notes=build`, bo workflow słucha też `repository_dispatch`).
+   Przy każdym zakończeniu workflow zakłada **issue z raportem** (ogon logu Gradle / „BUILD SUCCESSFUL"
+   + rozmiar APK) — to jedyne miejsce, skąd tę maszynę widać: logi CI są na innej domenie.
    Po 10–20 min (pierwszy raz) w tym runie pojawi się **artifact `NIXI-apk-debug`** — pobierasz,
    kopiujesz na telefon i instalujesz (Android: *Ustawienia → Zainstaluj przez USB / nieznane źródła*).
    Alternatywnie: `adb install -r app-debug.apk`.
@@ -82,6 +85,9 @@ name: Build NIXI APK (debug)
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [build-apk]
+  pull_request:
   push:
     branches:
       - main
@@ -153,12 +159,17 @@ jobs:
       # Logi CI leza na innej domenie niz api.github.com - ten krok wynosi blad tam,
       # skad da sie go odczytac (issue + job summary), zamiast klikac "View raw logs".
       - name: Publish build report (issue + job summary)
-        if: failure()
+        if: always()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          grep -E '^(FAILURE|> Task .*FAILED|BUILD FAILED|What went wrong|Caused by|e: )|^[[:space:]]+at ' /tmp/build.log \
+          grep -E '^(FAILURE|> Task .*FAILED|BUILD FAILED|What went wrong|Caused by|e: |w: )|^[[:space:]]+at |BUILD SUCCESSFUL' /tmp/build.log \
             | head -n 80 > /tmp/err.txt
+          if [ ! -s /tmp/err.txt ]; then tail -n 60 /tmp/build.log > /tmp/err.txt; fi
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            ls -l app/build/outputs/apk/debug/app-debug.apk >> /tmp/err.txt
+          fi
           {
             echo "## Build APK - raport bledu (run $GITHUB_RUN_ID)"
             echo
@@ -173,7 +184,7 @@ jobs:
           { echo "### Build APK - blad (skrot)"; echo; sed 's/^/    /' /tmp/err.txt; } >> "$GITHUB_STEP_SUMMARY"
           gh issue create \
             --repo "$GITHUB_REPOSITORY" \
-            --title "CI: APK build failed on $GITHUB_REF_NAME (${GITHUB_SHA:0:7})" \
+            --title "CI: APK build report on $GITHUB_REF_NAME (${GITHUB_SHA:0:7}) - ${{ job.status }}" \
             --body-file /tmp/report.md
 ```'
             tail -n 160 /tmp/build.log 2>/dev/null || echo "brak /tmp/build.log"
